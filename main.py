@@ -1,3 +1,5 @@
+# main_single(args)で単一クラスに対して訓練と評価、使用する訓練関数を分岐
+# argsでseedやgpuなどの設定
 import os
 import numpy as np
 import torch
