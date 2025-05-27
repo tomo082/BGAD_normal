@@ -282,7 +282,8 @@ class MVTecFSCopyPasteDataset(Dataset):
                 A.Transpose(),
                 A.OpticalDistortion(p=1.0, distort_limit=1.0),
                 A.OneOf([
-                    A.IAAAdditiveGaussianNoise(),
+                    #A.IAAAdditiveGaussianNoise(),
+                    A.GaussNoise(),
                     A.GaussNoise(),
                 ], p=0.2),
                 A.OneOf([
@@ -294,12 +295,15 @@ class MVTecFSCopyPasteDataset(Dataset):
                 A.OneOf([
                     A.OpticalDistortion(p=0.3),
                     A.GridDistortion(p=.1),
-                    A.IAAPiecewiseAffine(p=0.3),
+                    #A.IAAPiecewiseAffine(p=0.3),
+                    A.PiecewiseAffine(p=0.3),
                 ], p=0.2),
                 A.OneOf([
                     A.CLAHE(clip_limit=2),
-                    A.IAASharpen(),
-                    A.IAAEmboss(),
+                    #A.IAASharpen(),
+                    A.Sharpen(),
+                    #A.IAAEmboss(),
+                    A.Emboss(),
                     A.RandomBrightnessContrast(),            
                 ], p=0.3),
                 A.HueSaturationValue(p=0.3)]
