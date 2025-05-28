@@ -1,3 +1,6 @@
 """
 BGADがどのようにAnomaly Segmentationをおこなっているのか
+bgad_train_engine.pyとbgad_fas_train_engine.pyの違いについて、fasは(Few-Anomaly-Shot)?
+bgad_train_engine.pyは通常の教師ありAD,bgad_fas_train_engine.pyは正常データで事前学習し、少数の異常で微調整？
+
 """
