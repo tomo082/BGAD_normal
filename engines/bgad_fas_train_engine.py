@@ -189,7 +189,7 @@ def validate(args, epoch, data_loader, encoder, decoders):
     
     if args.vis and epoch == args.meta_epochs - 1:
         img_threshold, pix_threshold = evaluate_thresholds(gt_label, gt_mask, img_scores, scores)
-        save_dir = os.path.join(args.output_dir, args.exp_name, 'vis_results', args.class_name)
+        save_dir = os.path.join(args.output_dir_1, args.exp_name, 'vis_results', args.class_name)
         os.makedirs(save_dir, exist_ok=True)
         plot_visualizing_results(image_list, scores, img_scores, gt_mask_list, pix_threshold, 
                                  img_threshold, save_dir, file_names, img_types)
