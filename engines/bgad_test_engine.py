@@ -54,8 +54,9 @@ def validate(args, data_loader, encoder, decoders):
     # calculate detection AUROC
     img_scores = np.max(scores, axis=(1, 2))
     gt_label = np.asarray(gt_label_list, dtype=np.bool_)
-    #img_auc = roc_auc_score(gt_label, img_scores)
-    img_auc = -1
+    img_auc = roc_auc_score(gt_label, img_scores)
+    #元々はimg_aucが-1で固定されてた
+    # img_auc = -1
     # calculate segmentation AUROC
     gt_mask = np.squeeze(np.asarray(gt_mask_list, dtype=np.bool_), axis=1)
     pix_auc = roc_auc_score(gt_mask.flatten(), scores.flatten())
