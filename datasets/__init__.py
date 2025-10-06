@@ -1,6 +1,7 @@
 import torch
 from .mvtec import MVTEC_CLASS_NAMES, MVTecDataset, MVTecFSCopyPasteDataset, MVTecFSDataset, MVTecPseudoDataset, MVTecAnomalyDataset
 from .btad import BTAD_CLASS_NAMES, BTADDataset, BTADFSDataset, BTADFSCopyPasteDataset
+from .visa import VISA_CLASS_NAMES, VisaDataset, VisaFSDataset, VisaFSCopyPasteDataset, VisaPseudoDataset, VisaAnomalyDataset 
 from .utils import BalancedBatchSampler
 
 __all__ = ['MVTEC_CLASS_NAMES',
@@ -13,9 +14,16 @@ __all__ = ['MVTEC_CLASS_NAMES',
            'BTADDataset',
            'BTADFSDataset',
            'BTADFSCopyPasteDataset',
+           'VISA_CLASS_NAMES',        # 追加
+           'VisaDataset',             # 追加
+           'VisaFSDataset',           # 追加
+           'VisaFSCopyPasteDataset',  # 追加
+           'VisaPseudoDataset',       # 追加
+           'VisaAnomalyDataset',      # 追加
            'create_data_loader',
            'create_fas_data_loader',
            'create_test_data_loader']
+
 
 
 def create_data_loader(args):
@@ -65,6 +73,22 @@ def create_fas_data_loader(args):
             test_dataset  = BTADDataset(args, is_train=False, excluded_images=train_dataset.a_imgs)
         else:
             test_dataset  = BTADDataset(args, is_train=False)
+    elif args.dataset == 'visa': # このブロックを追加
+        normal_dataset = VisaDataset(args, is_train=True)
+        if args.data_strategy == '0':
+            train_dataset = VisaFSDataset(args, is_train=True)
+        elif args.data_strategy == '0,1':
+            train_dataset = VisaFSCopyPasteDataset(args, is_train=True)
+        elif args.data_strategy == '0,2':
+            train_dataset = VisaPseudoDataset(args, is_train=True)
+        elif args.data_strategy == '0,1,2':
+            train_dataset = VisaAnomalyDataset(args, is_train=True)
+            
+        if args.not_in_test:
+            # FSCopyPasteDataset, FSDataset, etc. have `a_imgs` attribute
+            test_dataset  = VisaDataset(args, is_train=False, excluded_images=train_dataset.a_imgs)
+        else:
+            test_dataset  = VisaDataset(args, is_train=False)
     else:
         raise NotImplementedError('{} is not supported dataset!'.format(args.dataset))
     # dataloader
@@ -84,6 +108,9 @@ def create_test_data_loader(args):
         test_dataset  = MVTecDataset(args, is_train=False)
     elif args.dataset == 'btad':
         test_dataset  = BTADDataset(args, is_train=False)
+    elif args.dataset == 'visa': # このブロックを追加
+        test_dataset = VisaDataset(args, is_train=False)
+               
     else:
         raise NotImplementedError('{} is not supported dataset!'.format(args.dataset))
     # dataloader
