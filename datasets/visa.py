@@ -70,7 +70,7 @@ class VisaDataset(Dataset):
         x, y, mask, types = [], [], [], []
         
         img_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Images')
-        mask_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Masks')
+        mask_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Masks', 'Anomaly')
 
         # 학습 시에는 정상 이미지만 사용
         if self.is_train:
@@ -159,7 +159,7 @@ class VisaFSDataset(Dataset):
         a_img_paths, a_labels, a_mask_paths = [], [], []
 
         img_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Images')
-        mask_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Masks')
+        mask_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Masks', 'Anomaly')
 
         # 정상 이미지 로드 (학습용)
         normal_dir = os.path.join(img_dir, 'Normal')
@@ -285,7 +285,7 @@ class VisaFSCopyPasteDataset(Dataset):
         a_img_paths, a_labels, a_mask_paths = [], [], []
 
         img_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Images')
-        mask_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Masks')
+        mask_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Masks', 'Anomaly')
 
         # 정상 이미지 로드 (학습용)
         normal_dir = os.path.join(img_dir, 'Normal')
