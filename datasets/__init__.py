@@ -26,6 +26,10 @@ def create_data_loader(args):
     elif args.dataset == 'btad':
         train_dataset = BTADDataset(args, is_train=True)
         test_dataset  = BTADDataset(args, is_train=False)
+               
+　  elif args.dataset == 'visa': # このelifブロックを追加
+        train_dataset = VisaDataset(args, is_train=True)
+        test_dataset  = VisaDataset(args, is_train=False)
     else:
         raise NotImplementedError('{} is not supported dataset!'.format(args.dataset))
     # dataloader
