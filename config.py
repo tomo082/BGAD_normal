@@ -11,7 +11,7 @@ def parse_args():
     
     # dataset and dataloader hyperparameters
     parser.add_argument('--dataset', default='mvtec', type=str, metavar='D',
-                        help='dataset name: mvtec/btad (default: mvtec)')
+                        help='dataset name: mvtec/btad/visa (default: mvtec)')
     parser.add_argument('--data_path', default='', type=str)
     parser.add_argument('--class_name', default='none', type=str, metavar='C',
                         help='class name for MVTecAD (default: none)')
