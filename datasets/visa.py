@@ -260,6 +260,8 @@ class VisaFSCopyPasteDataset(Dataset):
         aug = A.Compose([self.augmentors[aug_ind[0]], self.augmentors[aug_ind[1]], self.augmentors[aug_ind[2]]])
         return aug
 
+# datasets/visa.py の VisaFSCopyPasteDataset.copy_paste を修正
+
     def copy_paste(self, img_path, mask_path):
         n_idx = np.random.randint(len(self.n_imgs))
         aug = self.randAugmenter()
@@ -269,16 +271,22 @@ class VisaFSCopyPasteDataset(Dataset):
         n_image = cv2.imread(self.n_imgs[n_idx])
         n_image = cv2.cvtColor(n_image, cv2.COLOR_BGR2RGB)
         
+        # ===== 画像リサイズ処理を追加 =====
+        image = cv2.resize(image, dsize=(self.cropsize[1], self.cropsize[0]))
+        n_image = cv2.resize(n_image, dsize=(self.cropsize[1], self.cropsize[0]))
+        # ==================================
+
         mask = np.asarray(Image.open(mask_path).convert('L'))
+        mask = cv2.resize(mask, dsize=(self.cropsize[1], self.cropsize[0])) # マスクもリサイズ
         
         augmented = aug(image=image, mask=mask)
         aug_image, aug_mask = augmented['image'], augmented['mask']
         
-        # 255가 아닌 다른 값(e.g., 1)을 갖는 마스크를 위해 이진화
         aug_mask = np.where(aug_mask > 0, 255, 0).astype(np.uint8)
 
         n_image[aug_mask == 255, :] = aug_image[aug_mask == 255, :]
         return n_image, aug_mask
+        
 
     def load_dataset_folder(self):
         n_img_paths, n_labels, n_mask_paths = [], [], []
