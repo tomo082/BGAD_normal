@@ -52,6 +52,8 @@ def main():
             CLASS_NAMES = MVTEC_CLASS_NAMES 
         elif args.dataset == 'btad':
             CLASS_NAMES = BTAD_CLASS_NAMES 
+        elif args.dataset == 'visa':
+            CLASS_NAMES = VISA_CLASS_NAMES
     else:
         CLASS_NAMES = [args.class_name]
     for class_name in CLASS_NAMES:
