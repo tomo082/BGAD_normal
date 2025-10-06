@@ -50,6 +50,8 @@ class VisaDataset(Dataset):
     def __getitem__(self, idx):
         img_path, y, mask, img_type = self.x[idx], self.y[idx], self.mask[idx], self.img_types[idx]
 
+
+
         x = Image.open(img_path).convert('RGB')
         
         x = self.normalize(self.transform_x(x))
