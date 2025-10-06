@@ -1,4 +1,10 @@
+# datasets/visa.py
+
 import os
+import cv2
+import glob
+import random
+from PIL import Image
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -9,11 +15,13 @@ from .perlin import rand_perlin_2d_np
 from .nsa import patch_ex
 from .utils import excluding_images
 
+
 VISA_CLASS_NAMES = [
     'candle', 'capsules', 'cashew', 'chewinggum', 'fryum',
     'macaroni1', 'macaroni2', 'pcb1', 'pcb2', 'pcb3',
     'pcb4', 'pipe_fryum'
 ]
+
 
 class VisaDataset(Dataset):
     def __init__(self, c, is_train=True, excluded_images=None):
@@ -22,12 +30,11 @@ class VisaDataset(Dataset):
         self.class_name = c.class_name
         self.is_train = is_train
         self.cropsize = c.crop_size
+        
         # load dataset
+        self.x, self.y, self.mask, self.img_types = self.load_dataset_folder()
         if excluded_images is not None:
-            self.x, self.y, self.mask, self.img_types = self.load_dataset_folder()
             self.x, self.y, self.mask, self.img_types = excluding_images(self.x, self.y, self.mask, self.img_types, excluded_images)
-        else:
-            self.x, self.y, self.mask, self.img_types = self.load_dataset_folder()
 
         # set transforms
         self.transform_x = T.Compose([
@@ -54,49 +61,54 @@ class VisaDataset(Dataset):
             mask = Image.open(mask)
             mask = self.transform_mask(mask)
         
-        return x, y, mask, os.path.basename(img_path[:-4]), img_type
+        return x, y, mask, os.path.basename(img_path), img_type
 
     def __len__(self):
         return len(self.x)
 
     def load_dataset_folder(self):
-        phase = 'train' if self.is_train else 'test'
         x, y, mask, types = [], [], [], []
+        
+        img_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Images')
+        mask_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Masks')
 
-        img_dir = os.path.join(self.dataset_path, self.class_name, phase)
-        gt_dir = os.path.join(self.dataset_path, self.class_name, 'ground_truth')
-
-        img_types = sorted(os.listdir(img_dir))
-        for img_type in img_types:
-            img_type_dir = os.path.join(img_dir, img_type)
-            if not os.path.isdir(img_type_dir):
-                continue
-            
-            img_fpath_list = sorted([os.path.join(img_type_dir, f)
-                                     for f in os.listdir(img_type_dir)
-                                     if f.endswith('.png') or f.endswith('.jpg')])
+        # 학습 시에는 정상 이미지만 사용
+        if self.is_train:
+            normal_dir = os.path.join(img_dir, 'Normal')
+            img_fpath_list = [os.path.join(normal_dir, f) for f in sorted(os.listdir(normal_dir)) if f.endswith('.JPG')]
             x.extend(img_fpath_list)
+            y.extend([0] * len(img_fpath_list))
+            mask.extend([None] * len(img_fpath_list))
+            types.extend(['normal'] * len(img_fpath_list))
+        # 테스트 시에는 정상과 비정상 이미지를 모두 사용
+        else:
+            normal_dir = os.path.join(img_dir, 'Normal')
+            anomaly_dir = os.path.join(img_dir, 'Anomaly')
+            
+            # 정상 이미지 로드
+            normal_fpath_list = [os.path.join(normal_dir, f) for f in sorted(os.listdir(normal_dir)) if f.endswith('.JPG')]
+            x.extend(normal_fpath_list)
+            y.extend([0] * len(normal_fpath_list))
+            mask.extend([None] * len(normal_fpath_list))
+            types.extend(['normal'] * len(normal_fpath_list))
+            
+            # 비정상 이미지 로드
+            anomaly_fpath_list = [os.path.join(anomaly_dir, f) for f in sorted(os.listdir(anomaly_dir)) if f.endswith('.JPG')]
+            x.extend(anomaly_fpath_list)
+            y.extend([1] * len(anomaly_fpath_list))
+            
+            # 비정상 이미지에 대한 마스크 로드
+            mask_fpath_list = [os.path.join(mask_dir, os.path.splitext(os.path.basename(f))[0] + '.png') for f in anomaly_fpath_list]
+            mask.extend(mask_fpath_list)
+            types.extend(['anomaly'] * len(anomaly_fpath_list))
 
-            if img_type == 'normal':
-                y.extend([0] * len(img_fpath_list))
-                mask.extend([None] * len(img_fpath_list))
-                types.extend(['normal'] * len(img_fpath_list))
-            else:
-                y.extend([1] * len(img_fpath_list))
-                gt_type_dir = os.path.join(gt_dir, img_type)
-                img_fname_list = [os.path.splitext(os.path.basename(f))[0] for f in img_fpath_list]
-                gt_fpath_list = [os.path.join(gt_type_dir, img_fname + '.png')
-                                 for img_fname in img_fname_list]
-                mask.extend(gt_fpath_list)
-                types.extend([img_type] * len(img_fpath_list))
-
-        assert len(x) == len(y), 'number of x and y should be same'
-        return list(x), list(y), list(mask), list(types)
+        assert len(x) == len(y) == len(mask) == len(types)
+        return x, y, mask, types
 
 
 class VisaFSDataset(Dataset):
     def __init__(self, c, is_train=True):
-        assert c.class_name in VISA_CLASS_NAMES, 'class_name: {}, should be in {}'.format(c.class_name, VISA_CLASS_NAMES)
+        assert c.class_name in VISA_CLASS_NAMES
         self.dataset_path = c.data_path
         self.class_name = c.class_name
         self.is_train = is_train
@@ -146,46 +158,34 @@ class VisaFSDataset(Dataset):
         n_img_paths, n_labels, n_mask_paths = [], [], []
         a_img_paths, a_labels, a_mask_paths = [], [], []
 
-        img_dir = os.path.join(self.dataset_path, self.class_name, 'test')
-        gt_dir = os.path.join(self.dataset_path, self.class_name, 'ground_truth')
+        img_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Images')
+        mask_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Masks')
 
-        ano_types = sorted(os.listdir(img_dir))
-        for type_ in ano_types:
-            img_type_dir = os.path.join(img_dir, type_)
-            if not os.path.isdir(img_type_dir):
-                continue
-            
-            img_fpath_list = sorted([os.path.join(img_type_dir, f)
-                                     for f in os.listdir(img_type_dir)
-                                     if f.endswith('.png') or f.endswith('.jpg')])
-            
-            if type_ == 'normal':
-                continue
-            else:
-                random.shuffle(img_fpath_list)
-                num_anomalies_to_take = min(self.anomaly_nums, len(img_fpath_list))
-                a_img_paths.extend(img_fpath_list[:num_anomalies_to_take])
-                a_labels.extend([1] * num_anomalies_to_take)
-                
-                gt_type_dir = os.path.join(gt_dir, type_)
-                img_fname_list = [os.path.splitext(os.path.basename(f))[0] for f in img_fpath_list[:num_anomalies_to_take]]
-                gt_fpath_list = [os.path.join(gt_type_dir, img_fname + '.png') for img_fname in img_fname_list]
-                a_mask_paths.extend(gt_fpath_list)
-
-        img_dir = os.path.join(self.dataset_path, self.class_name, 'train', 'normal')
-        img_fpath_list = sorted([os.path.join(img_dir, f)
-                                 for f in os.listdir(img_dir)
-                                 if f.endswith('.png') or f.endswith('.jpg')])
+        # 정상 이미지 로드 (학습용)
+        normal_dir = os.path.join(img_dir, 'Normal')
+        img_fpath_list = [os.path.join(normal_dir, f) for f in sorted(os.listdir(normal_dir)) if f.endswith('.JPG')]
         n_img_paths.extend(img_fpath_list)
         n_labels.extend([0] * len(img_fpath_list))
         n_mask_paths.extend([None] * len(img_fpath_list))
+
+        # 비정상 이미지 로드 (Few-shot용 샘플)
+        anomaly_dir = os.path.join(img_dir, 'Anomaly')
+        anomaly_fpath_list = [os.path.join(anomaly_dir, f) for f in sorted(os.listdir(anomaly_dir)) if f.endswith('.JPG')]
+        random.shuffle(anomaly_fpath_list)
         
+        num_anomalies_to_take = min(self.anomaly_nums, len(anomaly_fpath_list))
+        a_img_paths.extend(anomaly_fpath_list[:num_anomalies_to_take])
+        a_labels.extend([1] * num_anomalies_to_take)
+        
+        mask_fpath_list = [os.path.join(mask_dir, os.path.splitext(os.path.basename(f))[0] + '.png') for f in anomaly_fpath_list[:num_anomalies_to_take]]
+        a_mask_paths.extend(mask_fpath_list)
+
         return n_img_paths, n_labels, n_mask_paths, a_img_paths, a_labels, a_mask_paths
 
 
 class VisaFSCopyPasteDataset(Dataset):
     def __init__(self, c, is_train=True):
-        assert c.class_name in VISA_CLASS_NAMES, 'class_name: {}, should be in {}'.format(c.class_name, VISA_CLASS_NAMES)
+        assert c.class_name in VISA_CLASS_NAMES
         self.dataset_path = c.data_path
         self.class_name = c.class_name
         self.is_train = is_train
@@ -196,10 +196,14 @@ class VisaFSCopyPasteDataset(Dataset):
 
         self.n_imgs, self.n_labels, self.n_masks, self.a_imgs, self.a_labels, self.a_masks = self.load_dataset_folder()
         
-        self.a_imgs = self.a_imgs * self.repeat_num
-        self.a_labels = self.a_labels * self.repeat_num
-        self.a_masks = self.a_masks * self.repeat_num
-        
+        self.a_imgs_real = self.a_imgs * self.reuse_times
+        self.a_labels_real = self.a_labels * self.reuse_times
+        self.a_masks_real = self.a_masks * self.reuse_times
+
+        self.a_imgs_generated = self.a_imgs * (self.repeat_num - self.reuse_times)
+        self.a_labels_generated = self.a_labels * (self.repeat_num - self.reuse_times)
+        self.a_masks_generated = self.a_masks * (self.repeat_num - self.reuse_times)
+
         self.transform_img = T.Compose([
             T.Resize(c.img_size, Image.ANTIALIAS),
             T.CenterCrop(c.crop_size),
@@ -221,20 +225,24 @@ class VisaFSCopyPasteDataset(Dataset):
         self.normalize = T.Compose([T.Normalize(c.norm_mean, c.norm_std)])
     
     def __len__(self):
-        return len(self.n_imgs) + len(self.a_imgs)
+        return len(self.n_imgs) + len(self.a_imgs_real) + len(self.a_imgs_generated)
 
     def __getitem__(self, idx):
-        if idx >= len(self.n_imgs):
-            idx_ = idx - len(self.n_imgs)
-            img, label, mask = self.a_imgs[idx_], self.a_labels[idx_], self.a_masks[idx_]
-            
-            # Apply copy-paste only to a subset of anomaly images to generate more diverse samples
-            if idx >= len(self.n_imgs) + len(self.a_imgs) // self.repeat_num * self.reuse_times:
-                img, mask = self.copy_paste(img, mask)
-                img, mask = Image.fromarray(img), Image.fromarray(mask)
-        else:
+        if idx < len(self.n_imgs):
+            # 정상 샘플
             img, label, mask = self.n_imgs[idx], self.n_labels[idx], self.n_masks[idx]
             img = Image.open(img).convert('RGB')
+        elif idx < len(self.n_imgs) + len(self.a_imgs_real):
+            # 실제 비정상 샘플
+            idx_ = idx - len(self.n_imgs)
+            img, label, mask = self.a_imgs_real[idx_], self.a_labels_real[idx_], self.a_masks_real[idx_]
+            img = Image.open(img).convert('RGB')
+        else:
+            # Copy-Paste로 생성된 비정상 샘플
+            idx_ = idx - len(self.n_imgs) - len(self.a_imgs_real)
+            img_path, label, mask_path = self.a_imgs_generated[idx_], self.a_labels_generated[idx_], self.a_masks_generated[idx_]
+            img, mask = self.copy_paste(img_path, mask_path)
+            img, mask = Image.fromarray(img), Image.fromarray(mask)
 
         img = self.normalize(self.transform_img(img))
         
@@ -261,11 +269,14 @@ class VisaFSCopyPasteDataset(Dataset):
         n_image = cv2.imread(self.n_imgs[n_idx])
         n_image = cv2.cvtColor(n_image, cv2.COLOR_BGR2RGB)
         
-        mask = np.asarray(Image.open(mask_path))
+        mask = np.asarray(Image.open(mask_path).convert('L'))
         
         augmented = aug(image=image, mask=mask)
         aug_image, aug_mask = augmented['image'], augmented['mask']
         
+        # 255가 아닌 다른 값(e.g., 1)을 갖는 마스크를 위해 이진화
+        aug_mask = np.where(aug_mask > 0, 255, 0).astype(np.uint8)
+
         n_image[aug_mask == 255, :] = aug_image[aug_mask == 255, :]
         return n_image, aug_mask
 
@@ -273,32 +284,28 @@ class VisaFSCopyPasteDataset(Dataset):
         n_img_paths, n_labels, n_mask_paths = [], [], []
         a_img_paths, a_labels, a_mask_paths = [], [], []
 
-        img_dir_test = os.path.join(self.dataset_path, self.class_name, 'test')
-        gt_dir = os.path.join(self.dataset_path, self.class_name, 'ground_truth')
-        
-        ano_types = [d for d in sorted(os.listdir(img_dir_test)) if os.path.isdir(os.path.join(img_dir_test, d)) and d != 'normal']
-        
-        for type_ in ano_types:
-            img_type_dir = os.path.join(img_dir_test, type_)
-            img_fpath_list = sorted([os.path.join(img_type_dir, f) for f in os.listdir(img_type_dir) if f.endswith(('.png', '.jpg'))])
-            
-            random.shuffle(img_fpath_list)
-            num_anomalies_to_take = min(self.anomaly_nums, len(img_fpath_list))
-            selected_imgs = img_fpath_list[:num_anomalies_to_take]
-            a_img_paths.extend(selected_imgs)
-            a_labels.extend([1] * len(selected_imgs))
-            
-            gt_type_dir = os.path.join(gt_dir, type_)
-            img_fname_list = [os.path.splitext(os.path.basename(f))[0] for f in selected_imgs]
-            gt_fpath_list = [os.path.join(gt_type_dir, img_fname + '.png') for img_fname in img_fname_list]
-            a_mask_paths.extend(gt_fpath_list)
+        img_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Images')
+        mask_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Masks')
 
-        img_dir_train = os.path.join(self.dataset_path, self.class_name, 'train', 'normal')
-        img_fpath_list_train = sorted([os.path.join(img_dir_train, f) for f in os.listdir(img_dir_train) if f.endswith(('.png', '.jpg'))])
-        n_img_paths.extend(img_fpath_list_train)
-        n_labels.extend([0] * len(img_fpath_list_train))
-        n_mask_paths.extend([None] * len(img_fpath_list_train))
+        # 정상 이미지 로드 (학습용)
+        normal_dir = os.path.join(img_dir, 'Normal')
+        img_fpath_list = [os.path.join(normal_dir, f) for f in sorted(os.listdir(normal_dir)) if f.endswith('.JPG')]
+        n_img_paths.extend(img_fpath_list)
+        n_labels.extend([0] * len(img_fpath_list))
+        n_mask_paths.extend([None] * len(img_fpath_list))
+
+        # 비정상 이미지 로드 (Copy-Paste 소스용)
+        anomaly_dir = os.path.join(img_dir, 'Anomaly')
+        anomaly_fpath_list = [os.path.join(anomaly_dir, f) for f in sorted(os.listdir(anomaly_dir)) if f.endswith('.JPG')]
+        random.shuffle(anomaly_fpath_list)
+
+        num_anomalies_to_take = min(self.anomaly_nums, len(anomaly_fpath_list))
+        a_img_paths.extend(anomaly_fpath_list[:num_anomalies_to_take])
+        a_labels.extend([1] * num_anomalies_to_take)
         
+        mask_fpath_list = [os.path.join(mask_dir, os.path.splitext(os.path.basename(f))[0] + '.png') for f in anomaly_fpath_list[:num_anomalies_to_take]]
+        a_mask_paths.extend(mask_fpath_list)
+
         return n_img_paths, n_labels, n_mask_paths, a_img_paths, a_labels, a_mask_paths
 
 
@@ -311,7 +318,7 @@ class VisaPseudoDataset(Dataset):
         self.anomaly_nums = c.num_anomalies
         self.repeat_num = 10
         
-        self.n_imgs, _, _, _, _, _ = self.load_dataset_folder()
+        self.n_imgs, _, _ , _, _, _ = self.load_dataset_folder()
         self.a_imgs = self.n_imgs * self.repeat_num
         
         self.transform_img_np = T.Compose([
@@ -383,7 +390,7 @@ class VisaPseudoDataset(Dataset):
     def __getitem__(self, idx):
         if idx < len(self.n_imgs):
             img_path, label, mask = self.n_imgs[idx], 0, torch.zeros([1, self.cropsize[0], self.cropsize[1]])
-            image = self.normalize(self.transform_img_np(Image.open(img_path).convert('RGB')))
+            image = self.normalize(T.ToTensor()(Image.open(img_path).convert('RGB')))
             return image, label, mask
         else:
             n_idx = np.random.randint(len(self.n_imgs))
@@ -395,10 +402,8 @@ class VisaPseudoDataset(Dataset):
         n_img_paths, n_labels, n_mask_paths = [], [], []
         a_img_paths, a_labels, a_mask_paths = [], [], []
         
-        img_dir = os.path.join(self.dataset_path, self.class_name, 'train', 'normal')
-        img_fpath_list = sorted([os.path.join(img_dir, f)
-                                 for f in os.listdir(img_dir)
-                                 if f.endswith('.png') or f.endswith('.jpg')])
+        img_dir = os.path.join(self.dataset_path, self.class_name, 'Data', 'Images', 'Normal')
+        img_fpath_list = [os.path.join(img_dir, f) for f in sorted(os.listdir(img_dir)) if f.endswith('.JPG')]
         n_img_paths.extend(img_fpath_list)
         n_labels.extend([0] * len(img_fpath_list))
         n_mask_paths.extend([None] * len(img_fpath_list))
@@ -415,7 +420,7 @@ class VisaAnomalyDataset(Dataset):
         return len(self.copy_paste_dataset) + len(self.pseudo_dataset) - len(self.copy_paste_dataset.n_imgs)
 
     def __getitem__(self, idx):
-        if idx >= len(self.pseudo_dataset):
-            return self.copy_paste_dataset.__getitem__(idx)
+        if idx < len(self.pseudo_dataset):
+             return self.pseudo_dataset.__getitem__(idx)
         else:
-            return self.pseudo_dataset.__getitem__(idx)
+             return self.copy_paste_dataset.__getitem__(idx - len(self.pseudo_dataset) + len(self.copy_paste_dataset.n_imgs))
