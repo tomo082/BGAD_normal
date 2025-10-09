@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import warnings
 from config import parse_args
-from datasets import MVTEC_CLASS_NAMES, BTAD_CLASS_NAMES
+from datasets import MVTEC_CLASS_NAMES, BTAD_CLASS_NAMES, VISA_CLASS_NAMES
 from utils.utils import init_seeds
 
 
