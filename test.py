@@ -37,12 +37,18 @@ def main():
     args.device = torch.device("cuda")
 
     img_aucs, pixel_aucs, pro_aucs = [], [], []
-    if args.class_name == 'none':  # default training all classes
-        CLASS_NAMES = MVTEC_CLASS_NAMES if args.dataset =='mvtec'
-        CLASS_NAMES = BTAD_CLASS_NAMES if args.dataset =='btad'
-        CLASS_NAMES = VISA_CLASS_NAMES if args.dataset =='visa'
+if args.class_name == 'none':
+    if args.dataset == 'mvtec':
+        CLASS_NAMES = MVTEC_CLASS_NAMES
+    elif args.dataset == 'btad':
+        CLASS_NAMES = BTAD_CLASS_NAMES
+    elif args.dataset == 'visa':
+        CLASS_NAMES = VISA_CLASS_NAMES
     else:
-        CLASS_NAMES = [args.class_name]
+        # 想定外のデータセット名が来た場合の処理を追加することもできます
+        CLASS_NAMES = [] # もしくはエラーを発生させる
+else:
+    CLASS_NAMES = [args.class_name]
     for class_name in CLASS_NAMES:
         args.class_name = class_name
         img_auc, pix_auc, pro_auc = main_single(args)
