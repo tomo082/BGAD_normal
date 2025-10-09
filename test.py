@@ -38,7 +38,9 @@ def main():
 
     img_aucs, pixel_aucs, pro_aucs = [], [], []
     if args.class_name == 'none':  # default training all classes
-        CLASS_NAMES = MVTEC_CLASS_NAMES if args.dataset == 'mvtec' else BTAD_CLASS_NAMES
+        CLASS_NAMES = MVTEC_CLASS_NAMES if args.dataset == 'mvtec'
+        CLASS_NAMES = BTAD_CLASS_NAMES if args.dataset =='btad'
+        CLASS_NAMES = VISA_CLASS_NAMES if args.dataset == 'visa'
     else:
         CLASS_NAMES = [args.class_name]
     for class_name in CLASS_NAMES:
