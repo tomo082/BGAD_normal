@@ -29,8 +29,13 @@ def main_single(args):
     
     # selecting train functions
     if args.with_fas:
-        from engines.bgad_fas_train_engine import train
-        img_auc, pix_auc, pix_pro = train(args)
+        if args.adapter:
+            from bgad_fas_train_engine_adapter import train
+            img_auc, pix_auc, pix_pro = train(args)
+        else:
+            from engines.bgad_fas_train_engine import train
+            img_auc, pix_auc, pix_pro = train(args)                       
+
     else:
         from engines.bgad_train_engine import train
         img_auc, pix_auc, pix_pro = train(args)
