@@ -234,7 +234,7 @@ def train(args):
         pix_pro_obs.update(100.0 * pix_pro, epoch)
         
     if args.save_results:
-        save_results(img_auc_obs, pix_auc_obs, pix_pro_obs, args.output_dir, args.exp_name, args.model_path, args.class_name)
-        save_weights(encoder, decoders, args.output_dir, args.exp_name, args.model_path)  # avoid unnecessary saves
+        save_results_ada(img_auc_obs, pix_auc_obs, pix_pro_obs, args.output_dir, args.exp_name, args.model_path, args.class_name)
+        save_weights_ada(encoder, decoders, args.output_dir, args.exp_name, args.model_path)  # avoid unnecessary saves
 
     return img_auc_obs.max_score, pix_auc_obs.max_score, pix_pro_obs.max_score
