@@ -3,6 +3,7 @@ import math
 import timm
 import torch
 import numpy as np
+import torch.nn as nn
 from tqdm import tqdm
 import torch.nn.functional as F
 from sklearn.metrics import roc_auc_score
