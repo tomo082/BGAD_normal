@@ -200,11 +200,16 @@ def validate(args, epoch, data_loader, encoder, decoders, adapters): # (modified
 
 def train(args):
     # Feature Extractor
-    encoder = timm.create_model(args.backbone_arch, features_only=True, 
+    encoder = timm.create_model(args.backbone_arch, features_only=True,
                 out_indices=[i+1 for i in range(args.feature_levels)], pretrained=True)
     encoder = encoder.to(args.device).eval()
     feat_dims = encoder.feature_info.channels()
-    
+    #(added 12.26) Feature Adapter >
+    adapters = [nn.Conv2d(in_channels=feat_dim, out_channels=feat_dim,kernel_size=1, stride=1)
+    for feat_dim in feat_dims]
+    adapters = [adapter.to(args.device) for adapter in adapters]
+    # < Feature Adapter
+
     # Normalizing Flows
     decoders = [load_flow_model(args, feat_dim) for feat_dim in feat_dims]
     decoders = [decoder.to(args.device) for decoder in decoders]
@@ -222,19 +227,21 @@ def train(args):
     pix_pro_obs = MetricRecorder('PIX_AUPRO')
     for epoch in range(args.meta_epochs):
         if args.checkpoint:
-            load_weights_ada(encoder, decoders, args.checkpoint)
+            load_weights(encoder, decoders, args.checkpoint)
 
         print('Train meta epoch: {}'.format(epoch))
-        train_meta_epoch(args, epoch, [normal_loader, train_loader], encoder, decoders, optimizer)
+        train_meta_epoch(args, epoch, [normal_loader, train_loader], encoder, decoders, optimizer,
+                         adapters)#modified 12.26
 
-        img_auc, pix_auc, pix_pro = validate(args, epoch, test_loader, encoder, decoders)
+        img_auc, pix_auc, pix_pro = validate(args, epoch, test_loader, encoder, decoders,
+                                             adapters) #modified 12.16
 
         img_auc_obs.update(100.0 * img_auc, epoch)
         pix_auc_obs.update(100.0 * pix_auc, epoch)
         pix_pro_obs.update(100.0 * pix_pro, epoch)
-        
+
     if args.save_results:
-        save_results(img_auc_obs, pix_auc_obs, pix_pro_obs, args.output_dir, args.exp_name, args.model_path, args.class_name)
+        save_results_ada(img_auc_obs, pix_auc_obs, pix_pro_obs, args.output_dir, args.exp_name, args.model_path, args.class_name)
         save_weights_ada(encoder, decoders, args.output_dir, args.exp_name, args.model_path)  # avoid unnecessary saves
 
     return img_auc_obs.max_score, pix_auc_obs.max_score, pix_pro_obs.max_score
