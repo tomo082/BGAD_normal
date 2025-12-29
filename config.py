@@ -77,7 +77,8 @@ def parse_args():
                         help='number of meta epochs to train (default: 25)')
     parser.add_argument('--sub_epochs', type=int, default=8, metavar='N',
                         help='number of sub epochs to train (default: 8)')
-
+    parser.add_argument('--adapter', type=str, default=None,
+                        help='additional adapter (default: 8)')
     # saving hyperparamters
     parser.add_argument('--output_dir', default='output', type=str, metavar='C',
                         help='name of the run (default: output)')
