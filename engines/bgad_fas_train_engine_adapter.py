@@ -15,8 +15,7 @@ from utils.utils import MetricRecorder, calculate_pro_metric, convert_to_anomaly
 
 log_theta = torch.nn.LogSigmoid()
 
-
-def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer):
+def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, adapters): #modified 12.16
     N_batch = 4096
     decoders = [decoder.train() for decoder in decoders]  # 3
     adjust_learning_rate(args, optimizer, epoch)
@@ -37,38 +36,40 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer):
                 image, _, mask, _, _ = data
             else:
                 image, _, mask = data
-            image = image.to(args.device)  
+            image = image.to(args.device)
             mask = mask.to(args.device)
             with torch.no_grad():
                 features = encoder(image)
+            for adapter in adapters: #modified 12.16
+                features = [adapter(feature) for feature in features]
             for l in range(args.feature_levels):
-                e = features[l].detach()  
+                e = features[l].detach()
                 bs, dim, h, w = e.size()
                 mask_ = F.interpolate(mask, size=(h, w), mode='nearest').squeeze(1)
                 mask_ = mask_.reshape(-1)
                 e = e.permute(0, 2, 3, 1).reshape(-1, dim)
-                
+
                 # (bs, 128, h, w)
                 pos_embed = positionalencoding2d(args.pos_embed_dim, h, w).to(args.device).unsqueeze(0).repeat(bs, 1, 1, 1)
                 pos_embed = pos_embed.permute(0, 2, 3, 1).reshape(-1, args.pos_embed_dim)
                 decoder = decoders[l]
-                
+
                 perm = torch.randperm(bs*h*w).to(args.device)
                 num_N_batches = bs*h*w // N_batch
                 for i in range(num_N_batches):
                     idx = torch.arange(i*N_batch, (i+1)*N_batch)
-                    p_b = pos_embed[perm[idx]]  
-                    e_b = e[perm[idx]]  
-                    m_b = mask_[perm[idx]]  
+                    p_b = pos_embed[perm[idx]]
+                    e_b = e[perm[idx]]
+                    m_b = mask_[perm[idx]]
                     if args.flow_arch == 'flow_model':
-                        z, log_jac_det = decoder(e_b)  
+                        z, log_jac_det = decoder(e_b)
                     else:
                         z, log_jac_det = decoder(e_b, [p_b, ])
-                    
+
                     # first epoch only training normal samples
                     if epoch == 0:
                         if m_b.sum() == 0:  # only normal loss
-                            logps = get_logp(dim, z, log_jac_det) 
+                            logps = get_logp(dim, z, log_jac_det)
                             logps = logps / dim
                             loss = -log_theta(logps).mean()
 
@@ -79,7 +80,7 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer):
                             loss_count += 1
                     else:
                         if m_b.sum() == 0:  # only normal ml loss
-                            logps = get_logp(dim, z, log_jac_det)  
+                            logps = get_logp(dim, z, log_jac_det)
                             logps = logps / dim
                             if args.focal_weighting:
                                 normal_weights = normal_fl_weighting(logps.detach())
@@ -88,8 +89,8 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer):
                             else:
                                 loss = -log_theta(logps).mean()
                         if m_b.sum() > 0:  # normal ml loss and bg_sppc loss
-                            logps = get_logp(dim, z, log_jac_det)  
-                            logps = logps / dim 
+                            logps = get_logp(dim, z, log_jac_det)
+                            logps = logps / dim
                             if args.focal_weighting:
                                 logps_detach = logps.detach()
                                 normal_logps = logps_detach[m_b == 0]
@@ -104,16 +105,16 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer):
                             else:
                                 loss_ml = -log_theta(logps[m_b == 0])
                                 loss_ml = torch.mean(loss_ml)
-                
+
                             boundaries = get_logp_boundary(logps, m_b, args.pos_beta, args.margin_tau, args.normalizer)
                             #print('feature level: {}, pos_beta: {}, boudaris: {}'.format(l, args.pos_beta, boundaries))
                             if args.focal_weighting:
                                 loss_n_con, loss_a_con = calculate_bg_spp_loss(logps, m_b, boundaries, args.normalizer, weights=weights)
                             else:
                                 loss_n_con, loss_a_con = calculate_bg_spp_loss(logps, m_b, boundaries, args.normalizer)
-                        
+
                             loss = loss_ml + args.bgspp_lambda * (loss_n_con + loss_a_con)
-                        
+
                         optimizer.zero_grad()
                         loss.backward()
                         optimizer.step()
