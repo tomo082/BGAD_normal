@@ -119,7 +119,7 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, ada
                             if i %10 ==0: #ログ検査用
                                 print(f"DEBUG [Batch {i}]")
                                 print(f"  Loss: {loss.item():.4e}")
-                                print(f"  Imgs min/max: {imgs.min():.2f}/{imgs.max():.2f}")
+                                print(f"  Imgs min/max: {data.min():.2f}/{data.max():.2f}")
                                     # NaNが出ているかチェック
                                 if torch.isnan(loss):
                                     print("  WARNING: Loss is NaN!")
