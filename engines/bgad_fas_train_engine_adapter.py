@@ -77,6 +77,9 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, ada
 
                             optimizer.zero_grad()
                             loss.backward()
+                            torch.nn.utils.clip_grad_norm_(encoder.parameters(), max_norm=1.0)#勾配クリッピング　12/30追加
+                            for decoder in decoders:
+                                torch.nn.utils.clip_grad_norm_(decoder.parameters(), max_norm=1.0)
                             optimizer.step()
                             total_loss += loss.item()
                             loss_count += 1
