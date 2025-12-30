@@ -127,6 +127,11 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, ada
                         optimizer.zero_grad()
                            
                         loss.backward()
+                        if torch.isnan(loss) or torch.isinf(loss):　# logが爆発したときの処理　12/30追加
+                            print("WARNING: Skip this batch due to NaN/Inf loss")
+                            optimizer.zero_grad() # 勾配をリセットして次へ
+                            continue
+                            
                         torch.nn.utils.clip_grad_norm_(encoder.parameters(), max_norm=1.0)#勾配クリッピング 12/30追加
                         for d in decoders:
                             torch.nn.utils.clip_grad_norm_(d.parameters(), max_norm=1.0)    
