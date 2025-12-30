@@ -212,7 +212,7 @@ def train(args):
     nn.Conv2d(in_channels=feat_dim, out_channels=feat_dim, kernel_size=1, stride=1)
     for feat_dim in feat_dims
     ]).to(args.device) #12/30
-    for feat_dim in feat_dims]
+    #for feat_dim in feat_dims]
     #adapters = [adapter.to(args.device) for adapter in adapters]
     # < Feature Adapter
 
