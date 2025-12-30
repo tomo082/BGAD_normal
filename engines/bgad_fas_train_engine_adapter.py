@@ -42,7 +42,8 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, ada
             with torch.no_grad():
                 features = encoder(image)
             for adapter in adapters: #modified 12.16
-                features = [adapter(feature) for feature in features]
+                features = [adapters[i](features[i]) for i in range(len(features))]#12/30
+                #features = [adapter(feature) for feature in features]
             for l in range(args.feature_levels):
                 e = features[l].detach()
                 bs, dim, h, w = e.size()
@@ -206,9 +207,13 @@ def train(args):
     encoder = encoder.to(args.device).eval()
     feat_dims = encoder.feature_info.channels()
     #(added 12.26) Feature Adapter >
-    adapters = [nn.Conv2d(in_channels=feat_dim, out_channels=feat_dim,kernel_size=1, stride=1)
+    #adapters = [nn.Conv2d(in_channels=feat_dim, out_channels=feat_dim,kernel_size=1, stride=1)
+    adapters = nn.ModuleList([
+    nn.Conv2d(in_channels=feat_dim, out_channels=feat_dim, kernel_size=1, stride=1)
+    for feat_dim in feat_dims
+    ]).to(args.device) #12/30
     for feat_dim in feat_dims]
-    adapters = [adapter.to(args.device) for adapter in adapters]
+    #adapters = [adapter.to(args.device) for adapter in adapters]
     # < Feature Adapter
 
     # Normalizing Flows
