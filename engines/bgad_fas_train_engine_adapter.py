@@ -72,6 +72,7 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, ada
                     if epoch == 0:
                         if m_b.sum() == 0:  # only normal loss
                             logps = get_logp(dim, z, log_jac_det)
+                            logps = torch.clamp(log_p, min=-1e6, max=1e6)#12/30 追加
                             logps = logps / dim
                             loss = -log_theta(logps).mean()
 
