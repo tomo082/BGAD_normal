@@ -116,13 +116,13 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, ada
                                 loss_n_con, loss_a_con = calculate_bg_spp_loss(logps, m_b, boundaries, args.normalizer)
 
                             loss = loss_ml + args.bgspp_lambda * (loss_n_con + loss_a_con)
-                            if i %10 ==0: #ログ検査用
-                                print(f"DEBUG [Batch {i}]")
-                                print(f"  Loss: {loss.item():.4e}")
-                                print(f"  Imgs min/max: {data[0].min().item():.2f}/{data[0].max().item():.2f}")
+                 #           if i %10 ==0: #ログ検査用
+                  #              print(f"DEBUG [Batch {i}]")
+                   #             print(f"  Loss: {loss.item():.4e}")
+                    #            print(f"  Imgs min/max: {data[0].min().item():.2f}/{data[0].max().item():.2f}")
                                     # NaNが出ているかチェック
-                                if torch.isnan(loss):
-                                    print("  WARNING: Loss is NaN!")
+                     #           if torch.isnan(loss):
+                      #              print("  WARNING: Loss is NaN!")
 
                         optimizer.zero_grad()
                            
