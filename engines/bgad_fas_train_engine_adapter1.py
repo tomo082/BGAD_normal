@@ -148,6 +148,7 @@ def validate(args, epoch, data_loader, encoder, decoders):
     print('\nCompute loss and scores on category: {}'.format(args.class_name))
     
     decoders = [decoder.eval() for decoder in decoders]
+    adapters = [adapter.eval() for adapter in adapters]
     
     image_list, gt_label_list, gt_mask_list, file_names, img_types = [], [], [], [], []
     logps_list = [list() for _ in range(args.feature_levels)]
