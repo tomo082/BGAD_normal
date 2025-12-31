@@ -396,7 +396,7 @@ def train(args):
 
     if args.save_results:
         save_results(img_auc_obs, pix_auc_obs, pix_pro_obs, args.output_dir, args.exp_name, args.model_path, args.class_name)
-        save_weights_ada(encoder, decoders, args.output_dir, args.exp_name, args.model_path)  # avoid unnecessary saves
+        save_weights_ada(encoder, decoders, args.output_dir, args.exp_name, args.model_path,adapters)  # avoid unnecessary saves
 
     return img_auc_obs.max_score, pix_auc_obs.max_score, pix_pro_obs.max_score
 
