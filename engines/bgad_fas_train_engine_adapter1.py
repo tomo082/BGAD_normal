@@ -17,24 +17,6 @@ from utils.utils import MetricRecorder, calculate_pro_metric, convert_to_anomaly
 log_theta = torch.nn.LogSigmoid()
 
 
-import os
-import math
-import timm
-import torch
-import torch.nn as nn
-import numpy as np
-from tqdm import tqdm
-import torch.nn.functional as F
-from sklearn.metrics import roc_auc_score
-from utils import t2np, get_logp, adjust_learning_rate, warmup_learning_rate, save_results, save_weights, load_weights,save_weights_ada, load_weights_ada
-from datasets import create_fas_data_loader
-from models import positionalencoding2d, load_flow_model
-from losses import get_logp_boundary, calculate_bg_spp_loss, normal_fl_weighting, abnormal_fl_weighting
-from utils.visualizer import plot_visualizing_results
-from utils.utils import MetricRecorder, calculate_pro_metric, convert_to_anomaly_scores, evaluate_thresholds
-
-log_theta = torch.nn.LogSigmoid()
-
 
 def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, adapters): #modified 12.16
     N_batch = 4096
@@ -92,6 +74,7 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, ada
                     if epoch == 0:
                         if m_b.sum() == 0:  # only normal loss
                             logps = get_logp(dim, z, log_jac_det)
+                            logps = torch.clamp(logps, min=-1e6, max=1e6)#12/30 追加
                             logps = logps / dim
                             loss = -log_theta(logps).mean()
 
