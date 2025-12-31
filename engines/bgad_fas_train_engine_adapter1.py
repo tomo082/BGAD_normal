@@ -18,10 +18,12 @@ log_theta = torch.nn.LogSigmoid()
 
 
 
-def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, adapters): #modified 12.16
+def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer,optimizer_ada, adapters): #modified 12.16
     N_batch = 4096
     decoders = [decoder.train() for decoder in decoders]  # 3
     adjust_learning_rate(args, optimizer, epoch)
+    adjust_learning_rate(args, optimizer_ada, epoch)
+    
     I = len(data_loader)
 
     # First epoch only training on normal samples to keep training steadily
@@ -81,6 +83,7 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, ada
                             optimizer.zero_grad()
                             loss.backward()
                             optimizer.step()
+                            optimizer_ada.step()
                             total_loss += loss.item()
                             loss_count += 1
                     else:
@@ -121,8 +124,10 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, ada
                             loss = loss_ml + args.bgspp_lambda * (loss_n_con + loss_a_con)
 
                         optimizer.zero_grad()
+                        oprimizer_ada.zero_grad()
                         loss.backward()
                         optimizer.step()
+                        optimizer_ada.step()
                         loss_item = loss.item()
                         if math.isnan(loss_item):
                             total_loss += 0.0
@@ -218,6 +223,8 @@ def train(args):
     nn.Conv2d(in_channels=feat_dim, out_channels=feat_dim, kernel_size=1, stride=1)
     for feat_dim in feat_dims
     ]).to(args.device) #12/30
+    params_ada = list(adapters[0].parameters())
+    optimizer_ada = torch.optim.Adam(params_ada, lr=args.lr)
     # < Feature Adapter
 
     # Normalizing Flows
@@ -342,6 +349,11 @@ def train(args):
     nn.Conv2d(in_channels=feat_dim, out_channels=feat_dim, kernel_size=1, stride=1)
     for feat_dim in feat_dims
     ]).to(args.device) #12/30
+        params_ada = list(adapters[0].parameters())
+    for l in range(1, args.feature_levels):
+        params_ada += list(adapters[l].parameters())
+    # optimizer
+    optimizer_ada = torch.optim.Adam(params_ada, lr=args.lr)
     # < Feature Adapter
 
     # Normalizing Flows
