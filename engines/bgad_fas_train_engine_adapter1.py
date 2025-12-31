@@ -378,8 +378,7 @@ def train(args):
         print('Train meta epoch: {}'.format(epoch))
         train_meta_epoch(args, epoch, [normal_loader, train_loader], encoder, decoders, optimizer,adapters)#modified 12.26
 
-        img_auc, pix_auc, pix_pro = validate(args, epoch, test_loader, encoder, decoders,
-                                             adapters) #modified 12.16
+        img_auc, pix_auc, pix_pro = validate(args, epoch, test_loader, encoder, decoders,adapters) #modified 12.16
 
         img_auc_obs.update(100.0 * img_auc, epoch)
         pix_auc_obs.update(100.0 * pix_auc, epoch)
