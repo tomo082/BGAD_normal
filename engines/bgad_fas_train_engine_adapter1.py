@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 import torch.nn.functional as F
 from sklearn.metrics import roc_auc_score
-from utils import t2np, get_logp, adjust_learning_rate, warmup_learning_rate, save_results, save_weights, load_weights
+from utils import t2np, get_logp, adjust_learning_rate, warmup_learning_rate, save_results, save_weights, load_weights,save_weights_ada, load_weights_ada
 from datasets import create_fas_data_loader
 from models import positionalencoding2d, load_flow_model
 from losses import get_logp_boundary, calculate_bg_spp_loss, normal_fl_weighting, abnormal_fl_weighting
