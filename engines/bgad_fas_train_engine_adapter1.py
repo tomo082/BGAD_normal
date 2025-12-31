@@ -62,7 +62,8 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer, ada
             with torch.no_grad():
                 features = encoder(image)
             for adapter in adapters: #modified 12.16
-                features = [adapter(feature) for feature in features]
+                features = [adapters[i](features[i]) for i in range(len(features))]#12/30
+                #features = [adapter(feature) for feature in features]
             for l in range(args.feature_levels):
                 e = features[l].detach()
                 bs, dim, h, w = e.size()
