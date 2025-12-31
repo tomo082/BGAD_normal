@@ -36,6 +36,7 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer,opti
         for i, (data) in enumerate(tqdm(data_loader)):
             # warm-up learning rate
             lr = warmup_learning_rate(args, epoch, i+sub_epoch*I, I*args.sub_epochs, optimizer)
+            lr = warmup_learning_rate(args, epoch, i+sub_epoch*I, I*args.sub_epochs, optimizer_ada)
 
             if epoch == 0:
                 image, _, mask, _, _ = data
