@@ -17,6 +17,25 @@ from utils.utils import MetricRecorder, calculate_pro_metric, convert_to_anomaly
 log_theta = torch.nn.LogSigmoid()
 
 
+import os
+import math
+import timm
+import torch
+import torch.nn as nn
+import numpy as np
+from tqdm import tqdm
+import torch.nn.functional as F
+from sklearn.metrics import roc_auc_score
+from utils import t2np, get_logp, adjust_learning_rate, warmup_learning_rate, save_results, save_weights, load_weights,save_weights_ada, load_weights_ada
+from datasets import create_fas_data_loader
+from models import positionalencoding2d, load_flow_model
+from losses import get_logp_boundary, calculate_bg_spp_loss, normal_fl_weighting, abnormal_fl_weighting
+from utils.visualizer import plot_visualizing_results
+from utils.utils import MetricRecorder, calculate_pro_metric, convert_to_anomaly_scores, evaluate_thresholds
+
+log_theta = torch.nn.LogSigmoid()
+
+
 def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer):
     N_batch = 4096
     decoders = [decoder.train() for decoder in decoders]  # 3
@@ -129,6 +148,128 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer):
         # mean_loss = total_loss / loss_count
         # print('Epoch: {:d}.{:d} \t train loss: {:.4f}, lr={:.6f}'.format(epoch, sub_epoch, mean_loss, lr))
 
+
+def validate(args, epoch, data_loader, encoder, decoders):
+    print('\nCompute loss and scores on category: {}'.format(args.class_name))
+    
+    decoders = [decoder.eval() for decoder in decoders]
+    
+    image_list, gt_label_list, gt_mask_list, file_names, img_types = [], [], [], [], []
+    logps_list = [list() for _ in range(args.feature_levels)]
+    total_loss, loss_count = 0.0, 0
+    with torch.no_grad():
+        for i, (image, label, mask, file_name, img_type) in enumerate(tqdm(data_loader)):
+            # image: (32, 3, 256); label: (32, ); mask: (32, 1, 256, 256)
+            if args.vis:
+                image_list.extend(t2np(image))
+                file_names.extend(file_name)
+                img_types.extend(img_type)
+            gt_label_list.extend(t2np(label))
+            gt_mask_list.extend(t2np(mask))
+            
+            image = image.to(args.device) # single scale
+            features = encoder(image)  # BxCxHxW
+            for l in range(args.feature_levels):
+                e = features[l]  # BxCxHxW
+                bs, dim, h, w = e.size()
+                e = e.permute(0, 2, 3, 1).reshape(-1, dim)
+               
+                # (bs, 128, h, w)
+                pos_embed = positionalencoding2d(args.pos_embed_dim, h, w).to(args.device).unsqueeze(0).repeat(bs, 1, 1, 1)
+                pos_embed = pos_embed.permute(0, 2, 3, 1).reshape(-1, args.pos_embed_dim)
+                decoder = decoders[l]
+
+                if args.flow_arch == 'flow_model':
+                    z, log_jac_det = decoder(e)  
+                else:
+                    z, log_jac_det = decoder(e, [pos_embed, ])
+
+                logps = get_logp(dim, z, log_jac_det)  
+                logps = logps / dim  
+                loss = -log_theta(logps).mean() 
+                total_loss += loss.item()
+                loss_count += 1
+                logps_list[l].append(logps.reshape(bs, h, w))
+    
+    mean_loss = total_loss / loss_count
+    print('Epoch: {:d} \t test_loss: {:.4f}'.format(epoch, mean_loss))
+    
+    scores = convert_to_anomaly_scores(args, logps_list)
+    # calculate detection AUROC
+    img_scores = np.max(scores, axis=(1, 2))
+    gt_label = np.asarray(gt_label_list, dtype=np.bool_)
+    img_auc = roc_auc_score(gt_label, img_scores)
+    # calculate segmentation AUROC
+    gt_mask = np.squeeze(np.asarray(gt_mask_list, dtype=np.bool_), axis=1)
+    pix_auc = roc_auc_score(gt_mask.flatten(), scores.flatten())
+    #pix_auc = -1
+    pix_pro = -1
+    if args.pro:
+        pix_pro = calculate_pro_metric(scores, gt_mask)
+    
+    if args.vis and epoch == args.meta_epochs - 1:
+        img_threshold, pix_threshold = evaluate_thresholds(gt_label, gt_mask, img_scores, scores)
+        save_dir = os.path.join(args.output_dir_1, args.exp_name, 'vis_results', args.class_name)
+        os.makedirs(save_dir, exist_ok=True)
+        plot_visualizing_results(image_list, scores, img_scores, gt_mask_list, pix_threshold, 
+                                 img_threshold, save_dir, file_names, img_types)
+
+    return img_auc, pix_auc, pix_pro
+
+
+def train(args):
+    # Feature Extractor
+    encoder = timm.create_model(args.backbone_arch, features_only=True,
+                out_indices=[i+1 for i in range(args.feature_levels)], pretrained=True)
+    encoder = encoder.to(args.device).eval()
+    feat_dims = encoder.feature_info.channels()
+    #(added 12.26) Feature Adapter >
+    #adapters = [nn.Conv2d(in_channels=feat_dim, out_channels=feat_dim,kernel_size=1, stride=1)
+    #for feat_dim in feat_dims]
+    #adapters = [adapter.to(args.device) for adapter in adapters]
+    adapters = nn.ModuleList([
+    nn.Conv2d(in_channels=feat_dim, out_channels=feat_dim, kernel_size=1, stride=1)
+    for feat_dim in feat_dims
+    ]).to(args.device) #12/30
+    # < Feature Adapter
+
+    # Normalizing Flows
+    decoders = [load_flow_model(args, feat_dim) for feat_dim in feat_dims]
+    decoders = [decoder.to(args.device) for decoder in decoders]
+    params = list(decoders[0].parameters())
+    for l in range(1, args.feature_levels):
+        params += list(decoders[l].parameters())
+    # optimizer
+    optimizer = torch.optim.Adam(params, lr=args.lr)
+    # data loaders
+    normal_loader, train_loader, test_loader = create_fas_data_loader(args)
+
+    # stats
+    img_auc_obs = MetricRecorder('IMG_AUROC')
+    pix_auc_obs = MetricRecorder('PIX_AUROC')
+    pix_pro_obs = MetricRecorder('PIX_AUPRO')
+    for epoch in range(args.meta_epochs):
+        if args.checkpoint:
+            load_weights(encoder, decoders, args.checkpoint)
+
+        print('Train meta epoch: {}'.format(epoch))
+        train_meta_epoch(args, epoch, [normal_loader, train_loader], encoder, decoders, optimizer,
+                         adapters)#modified 12.26
+
+        img_auc, pix_auc, pix_pro = validate(args, epoch, test_loader, encoder, decoders,
+                                             adapters) #modified 12.16
+
+        img_auc_obs.update(100.0 * img_auc, epoch)
+        pix_auc_obs.update(100.0 * pix_auc, epoch)
+        pix_pro_obs.update(100.0 * pix_pro, epoch)
+
+    if args.save_results:
+        save_results_ada(img_auc_obs, pix_auc_obs, pix_pro_obs, args.output_dir, args.exp_name, args.model_path, args.class_name)
+        save_weights_ada(encoder, decoders, args.output_dir, args.exp_name, args.model_path)  # avoid unnecessary saves
+
+    return img_auc_obs.max_score, pix_auc_obs.max_score, pix_pro_obs.max_score
+        # mean_loss = total_loss / loss_count
+        # print('Epoch: {:d}.{:d} \t train loss: {:.4f}, lr={:.6f}'.format(epoch, sub_epoch, mean_loss, lr))
 
 def validate(args, epoch, data_loader, encoder, decoders):
     print('\nCompute loss and scores on category: {}'.format(args.class_name))
