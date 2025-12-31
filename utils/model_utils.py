@@ -31,7 +31,7 @@ def load_weights_ada(encoder, decoders, filename):
     state = torch.load(filename)
     encoder.load_state_dict(state['encoder_state_dict'], strict=False)
     decoders = [decoder.load_state_dict(state, strict=False) for decoder, state in zip(decoders, state['decoder_state_dict'])]
-    adapters = [adapters.load_state_dict(state, strict=False) for adapter, state in zip(adapters, state['decoder_state_dict'])]#modified 12.26
+    adapters = [adapters.load_state_dict(state, strict=False) for adapter, state in zip(adapters, state['adapter_state_dict'])]#modified 12.26
     print('Loading weights from {}'.format(filename))
     
 def save_results(det_roc_obs, seg_roc_obs, seg_pro_obs, output_dir, exp_name, model_path, class_name):
