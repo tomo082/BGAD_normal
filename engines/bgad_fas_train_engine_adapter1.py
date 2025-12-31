@@ -349,7 +349,7 @@ def train(args):
     nn.Conv2d(in_channels=feat_dim, out_channels=feat_dim, kernel_size=1, stride=1)
     for feat_dim in feat_dims
     ]).to(args.device) #12/30
-        params_ada = list(adapters[0].parameters())
+    params_ada = list(adapters[0].parameters())
     for l in range(1, args.feature_levels):
         params_ada += list(adapters[l].parameters())
     # optimizer
