@@ -92,6 +92,7 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer,opti
                     else:
                         if m_b.sum() == 0:  # only normal ml loss
                             logps = get_logp(dim, z, log_jac_det)
+                            logps = torch.clamp(logps, min=-1e6, max=1e6)#12/30 追加
                             logps = logps / dim
                             if args.focal_weighting:
                                 normal_weights = normal_fl_weighting(logps.detach())
@@ -133,7 +134,7 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer,opti
                         optimizer.step()
                         optimizer_ada.step()
                         loss_item = loss.item()
-                        if math.isnan(loss_item):
+                        if math.isnan(loss_item) or math.isinf(loss_item):
                             total_loss += 0.0
                             loss_count += 0
                         else:
