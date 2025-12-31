@@ -376,7 +376,7 @@ def train(args):
             load_weights(encoder, decoders, args.checkpoint)
 
         print('Train meta epoch: {}'.format(epoch))
-        train_meta_epoch(args, epoch, [normal_loader, train_loader], encoder, decoders, optimizer,adapters)#modified 12.26
+        train_meta_epoch(args, epoch, [normal_loader, train_loader], encoder, decoders, optimizer,optimizer_ada,adapters)#modified 12.26
 
         img_auc, pix_auc, pix_pro = validate(args, epoch, test_loader, encoder, decoders,adapters) #modified 12.16
 
