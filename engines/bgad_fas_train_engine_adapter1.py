@@ -46,8 +46,9 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer,opti
             mask = mask.to(args.device)
             with torch.no_grad():
                 features = encoder(image)
-            for adapter in adapters: #modified 12.16
-                features = [adapters[i](features[i]) for i in range(len(features))]#12/30
+            features = [adapters[i](features[i]) for i in range(len(features))]
+            #for adapter in adapters: #modified 12.16
+                #features = [adapters[i](features[i]) for i in range(len(features))]#12/30
                 #features = [adapter(feature) for feature in features]
             for l in range(args.feature_levels):
                 e = features[l].detach()
