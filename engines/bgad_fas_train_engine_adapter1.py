@@ -124,7 +124,7 @@ def train_meta_epoch(args, epoch, data_loader, encoder, decoders, optimizer,opti
                             loss = loss_ml + args.bgspp_lambda * (loss_n_con + loss_a_con)
 
                         optimizer.zero_grad()
-                        oprimizer_ada.zero_grad()
+                        optimizer_ada.zero_grad()
                         loss.backward()
                         optimizer.step()
                         optimizer_ada.step()
